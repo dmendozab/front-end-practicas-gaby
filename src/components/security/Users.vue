@@ -219,26 +219,13 @@
 </template>
 
 <script>
+import { getUsers, addUser, updateUser, deleteUser } from "@/api/users";
+
 export default {
   name: 'Users',
   data() {
     return {
-      users: [
-        {
-          id: 1,
-          name: 'Administrador',
-          username: 'Admin',
-          description: 'Administrador del sistema',
-          email: 'admin@sigsa.com',
-          isAdmin: true,
-          canWrite: false,
-          canRead: true,
-          canCommands: true,
-          canReports: true,
-          canChangeEmail: false,
-          active: true
-        }
-      ],
+      users: [],
       rowsPerPage: 10,
       currentPage: 1,
       showAddModal: false,
@@ -258,118 +245,155 @@ export default {
         password: ''
       },
       editingUser: {},
-      availableRoles: [
-        { id: 1, name: 'Admin' },
-        { id: 2, name: 'GerenteSucursal' },
-        { id: 3, name: 'Operador' },
-        { id: 4, name: 'Supervisor' }
-      ],
+      availableRoles: [],
       currentUserRoles: []
-    }
+    };
   },
   computed: {
     paginatedUsers() {
-      const start = (this.currentPage - 1) * this.rowsPerPage
-      const end = start + this.rowsPerPage
-      return this.users.slice(start, end)
+      const start = (this.currentPage - 1) * this.rowsPerPage;
+      const end = start + this.rowsPerPage;
+      return this.users.slice(start, end);
     },
     paginationText() {
-      const start = (this.currentPage - 1) * this.rowsPerPage + 1
-      const end = Math.min(this.currentPage * this.rowsPerPage, this.users.length)
-      return `${start}-${end} de ${this.users.length}`
+      const start = (this.currentPage - 1) * this.rowsPerPage + 1;
+      const end = Math.min(this.currentPage * this.rowsPerPage, this.users.length);
+      return `${start}-${end} de ${this.users.length}`;
     }
   },
   methods: {
-    addUser() {
-      const user = {
-        id: this.users.length + 1,
-        ...this.newUser,
-        isAdmin: false,
-        canWrite: false,
-        canRead: true,
-        canCommands: false,
-        canReports: false,
-        canChangeEmail: false,
-        active: true
-      }
-      this.users.push(user)
-      this.closeAddModal()
-      alert('Usuario agregado exitosamente')
-    },
+    async loadUsers() {
+  try {
+    // getUsers ya retorna el array normalizado
+    this.users = await getUsers();
+  } catch (err) {
+    console.error("Error al obtener usuarios:", err);
+  }
+}
+
+,
+    async addUser() {
+  try {
+    // Validaciones mínimas
+    if (!this.newUser.username || !this.newUser.name) {
+      alert("Usuario y nombre son obligatorios.");
+      return;
+    }
+
+    if (!this.newUser.password || this.newUser.password.trim() === "") {
+      alert("La contraseña es obligatoria.");
+      return;
+    }
+
+    if (!this.newUser.email || this.newUser.email.trim() === "") {
+      alert("El correo es obligatorio.");
+      return;
+    }
+
+    const payload = {
+      usuario: this.newUser.username,
+      nombre: this.newUser.name,
+      contrasenia: this.newUser.password,
+      descripcion: this.newUser.description || "",
+      email: this.newUser.email,
+      vigente: !!this.newUser.active
+    };
+
+    await addUser(payload);
+    alert("Usuario agregado");
+    this.closeAddModal();
+    this.loadUsers();
+  } catch (err) {
+    console.error("Error al agregar usuario:", err);
+  }
+}
+,
     editUser(user) {
-      this.editingUser = { ...user }
-      this.showEditModal = true
+      this.editingUser = { ...user };
+      this.showEditModal = true;
     },
-    updateUser() {
-      const index = this.users.findIndex(u => u.id === this.editingUser.id)
-      if (index !== -1) {
-        this.users[index] = { ...this.editingUser }
-      }
-      this.closeEditModal()
-      alert('Usuario actualizado exitosamente')
-    },
+   async updateUser() {
+  try {
+    if (!this.editingUser || !this.editingUser.id) {
+      alert("Falta el ID del usuario a actualizar.");
+      return;
+    }
+
+    if (!this.editingUser.username || !this.editingUser.name) {
+      alert("Usuario y nombre son obligatorios.");
+      return;
+    }
+
+    // El schema de tu Swagger exige contrasenia en PUT
+    if (!this.editingUser.password || this.editingUser.password.trim() === "") {
+      alert("Debes ingresar la contraseña para actualizar.");
+      return;
+    }
+
+    const payload = {
+      id: this.editingUser.id,
+      usuario: this.editingUser.username,
+      nombre: this.editingUser.name,
+      contrasenia: this.editingUser.password,
+      descripcion: this.editingUser.description || "",
+      email: this.editingUser.email || "",
+      vigente: !!this.editingUser.active
+    };
+
+    await updateUser(payload);
+    alert("Usuario actualizado");
+    this.closeEditModal();
+    this.loadUsers();
+  } catch (err) {
+    console.error("Error al actualizar usuario:", err);
+  }
+}
+
+,
     confirmDelete(user) {
-      this.userToDelete = user
-      this.showDeleteModal = true
+      this.userToDelete = user;
+      this.showDeleteModal = true;
     },
-    deleteUser() {
-      this.users = this.users.filter(u => u.id !== this.userToDelete.id)
-      this.showDeleteModal = false
-      this.userToDelete = null
-      alert('Usuario eliminado exitosamente')
-    },
-    showRolesModal(user) {
-      this.currentUserForRoles = user
-      this.currentUserRoles = [
-        { id: 1, name: 'Admin', isDefault: true },
-        { id: 2, name: 'GerenteSucursal', isDefault: false }
-      ]
-      this.showRolesWindow = true
-    },
-    addRoleToUser() {
-      if (this.selectedRole) {
-        const exists = this.currentUserRoles.find(r => r.id === this.selectedRole.id)
-        if (!exists) {
-          this.currentUserRoles.push({
-            ...this.selectedRole,
-            isDefault: false
-          })
-        }
-        this.selectedRole = ''
-      }
-    },
-    confirmDeleteRole(role) {
-      this.roleToDelete = role
-      this.showDeleteRoleModal = true
-    },
-    deleteRoleFromUser() {
-      this.currentUserRoles = this.currentUserRoles.filter(r => r.id !== this.roleToDelete.id)
-      this.showDeleteRoleModal = false
-      this.roleToDelete = null
-      alert('Rol eliminado exitosamente')
-    },
+    async deleteUser() {
+  try {
+    await deleteUser({
+      id_usuario: this.userToDelete.id   // envía objeto con id_usuario
+    });
+
+    alert("Usuario eliminado");
+    this.showDeleteModal = false;
+    this.loadUsers();
+  } catch (err) {
+    console.error("Error al eliminar usuario:", err);
+  }
+}
+,
     closeAddModal() {
-      this.showAddModal = false
+      this.showAddModal = false;
       this.newUser = {
         name: '',
         username: '',
         description: '',
         email: '',
         password: ''
-      }
+      };
     },
     closeEditModal() {
-      this.showEditModal = false
-      this.editingUser = {}
+      this.showEditModal = false;
+      this.editingUser = {};
     },
     closeRolesModal() {
-      this.showRolesWindow = false
-      this.currentUserForRoles = null
-      this.selectedRole = ''
+      this.showRolesWindow = false;
+      this.currentUserForRoles = null;
+      this.selectedRole = '';
     }
+  },
+  mounted() {
+    this.loadUsers();
   }
-}
+};
 </script>
+
 
 <style scoped>
 .users-section {
