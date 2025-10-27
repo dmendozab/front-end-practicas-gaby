@@ -1,9 +1,25 @@
 <template>
   <div class="roles-section">
     <div class="actions-bar">
-      <button class="btn-add" @click="showAddModal = true">
-        ➕ Agregar Rol
-      </button>
+      <div class="search-box">
+        <input 
+          type="text" 
+          v-model="searchQuery" 
+          placeholder="Buscar rol..."
+          class="search-input"
+        >
+        <button class="btn-search" @click="searchRoles" title="Buscar">
+          🔍 Buscar
+        </button>
+      </div>
+      <div class="action-buttons-group">
+        <button class="btn-download" @click="downloadExcel" title="Descargar Excel">
+          📥 Descargar
+        </button>
+        <button class="btn-add" @click="showAddModal = true">
+          ➕ Agregar
+        </button>
+      </div>
     </div>
 
     <div class="table-container">
@@ -129,8 +145,28 @@ export default {
           name: 'Administración',
           description: 'Administrador',
           active: true
+        },
+        {
+          id: 3,
+          name: 'Gerente Sucursal',
+          description: 'Gerente de sucursal',
+          active: true
+        },
+        {
+          id: 4,
+          name: 'Operador',
+          description: 'Operador del sistema',
+          active: true
+        },
+        {
+          id: 5,
+          name: 'Supervisor',
+          description: 'Supervisor de área',
+          active: false
         }
       ],
+      filteredRoles: [],
+      searchQuery: '',
       rowsPerPage: 10,
       currentPage: 1,
       showAddModal: false,
@@ -145,18 +181,64 @@ export default {
     }
   },
   computed: {
+    displayRoles() {
+      return this.filteredRoles.length > 0 || this.searchQuery ? this.filteredRoles : this.roles
+    },
     paginatedRoles() {
       const start = (this.currentPage - 1) * this.rowsPerPage
       const end = start + this.rowsPerPage
-      return this.roles.slice(start, end)
+      return this.displayRoles.slice(start, end)
     },
     paginationText() {
       const start = (this.currentPage - 1) * this.rowsPerPage + 1
-      const end = Math.min(this.currentPage * this.rowsPerPage, this.roles.length)
-      return `${start}-${end} de ${this.roles.length}`
+      const end = Math.min(this.currentPage * this.rowsPerPage, this.displayRoles.length)
+      return `${start}-${end} de ${this.displayRoles.length}`
     }
   },
   methods: {
+    searchRoles() {
+      if (!this.searchQuery.trim()) {
+        this.filteredRoles = []
+        this.currentPage = 1
+        return
+      }
+      
+      const query = this.searchQuery.toLowerCase()
+      this.filteredRoles = this.roles.filter(role => 
+        role.name.toLowerCase().includes(query) ||
+        role.description.toLowerCase().includes(query) ||
+        role.id.toString().includes(query)
+      )
+      this.currentPage = 1
+    },
+    downloadExcel() {
+      // Crear contenido CSV
+      const headers = ['Id rol', 'Nombre', 'Descripción', 'Vigente']
+      const rows = this.displayRoles.map(role => [
+        role.id,
+        role.name,
+        role.description,
+        role.active ? 'Si' : 'No'
+      ])
+      
+      let csvContent = headers.join(',') + '\n'
+      rows.forEach(row => {
+        csvContent += row.map(cell => `"${cell}"`).join(',') + '\n'
+      })
+      
+      // Crear blob y descargar
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      link.setAttribute('href', url)
+      link.setAttribute('download', `roles_${new Date().toISOString().split('T')[0]}.csv`)
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      alert('Archivo descargado exitosamente')
+    },
     addRole() {
       const role = {
         id: this.roles.length + 1,
@@ -200,6 +282,14 @@ export default {
       this.showEditModal = false
       this.editingRole = {}
     }
+  },
+  watch: {
+    searchQuery(newVal) {
+      if (!newVal.trim()) {
+        this.filteredRoles = []
+        this.currentPage = 1
+      }
+    }
   }
 }
 </script>
@@ -217,7 +307,73 @@ export default {
 .actions-bar {
   margin-bottom: 1.5rem;
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.search-box {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+  max-width: 500px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: all 0.3s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #1e3c72;
+  box-shadow: 0 0 0 3px rgba(30, 60, 114, 0.1);
+}
+
+.btn-search {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.btn-search:hover {
+  background: #218838;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.action-buttons-group {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-download {
+  background: #17a2b8;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.btn-download:hover {
+  background: #138496;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(23, 162, 184, 0.3);
 }
 
 .btn-add {
@@ -229,6 +385,7 @@ export default {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
+  white-space: nowrap;
 }
 
 .btn-add:hover {
@@ -474,6 +631,24 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .actions-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-box {
+    max-width: 100%;
+  }
+  
+  .action-buttons-group {
+    width: 100%;
+  }
+  
+  .btn-download,
+  .btn-add {
+    flex: 1;
+  }
+  
   .data-table {
     font-size: 0.85rem;
   }
